@@ -1,7 +1,10 @@
 package com.example.mlh.coolweather;
 
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.widget.TextView;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -19,6 +22,7 @@ import android.widget.Toast;
 import com.example.mlh.coolweather.db.City;
 import com.example.mlh.coolweather.db.County;
 import com.example.mlh.coolweather.db.Province;
+import com.example.mlh.coolweather.gson.Weather;
 import com.example.mlh.coolweather.util.HttpUtil;
 import com.example.mlh.coolweather.util.Utility;
 import com.example.mlh.coolweather.db.Province;
@@ -81,12 +85,24 @@ public class ChooseAreaFragment extends Fragment {
                 }else if (currentLevel == LEVEL_CITY){
                     selectedCity = cityList.get(position);
                     queryCounties();
-                }else if ( currentLevel == LEVEL_COUNTY){
+                }else if (currentLevel == LEVEL_COUNTY) {
                     String weatherId = countyList.get(position).getWeatherId();
-                    Intent intent = new Intent(getActivity(),WeatherActivity.class);
-                    intent.putExtra("weather_id",weatherId);
-                    startActivity(intent);
-                    getActivity().finish();
+                    Log.e("ASF_weather:",weatherId);
+                    SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(getContext().getApplicationContext()).edit();
+                    editor.putString("weatherId", weatherId);
+                    editor.apply();
+                    if (getActivity() instanceof MainActivity) {
+                        Intent intent = new Intent(getActivity(), WeatherActivity.class);
+                        intent.putExtra("weather_id", weatherId);
+                        startActivity(intent);
+                        getActivity().finish();
+                    } else if (getActivity() instanceof WeatherActivity) {
+                        WeatherActivity activity = (WeatherActivity) getActivity();
+                        activity.drawerLayout.closeDrawers();
+                        activity.swipeRefresh.setRefreshing(true);
+                        activity.requestWeather(weatherId);
+                    }
+
                 }
             }
         });

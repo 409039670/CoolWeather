@@ -1,5 +1,6 @@
 package com.example.mlh.coolweather;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
@@ -22,6 +23,7 @@ import android.widget.Toast;
 import com.bumptech.glide.Glide;
 import com.example.mlh.coolweather.gson.Forecast;
 import com.example.mlh.coolweather.gson.Weather;
+import com.example.mlh.coolweather.service.AutoUpdateService;
 import com.example.mlh.coolweather.util.HttpUtil;
 import com.example.mlh.coolweather.util.Utility;
 
@@ -46,6 +48,10 @@ public class WeatherActivity extends AppCompatActivity {
     private TextView carWashText;
     private TextView sportText;
     private ImageView bingPicimg;
+    public SwipeRefreshLayout swipeRefresh;
+    private String mWeatherId = null;
+    public DrawerLayout drawerLayout;
+    private Button navButton;
 
 protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -72,30 +78,53 @@ protected void onCreate(Bundle savedInstanceState) {
     comfortText = (TextView) findViewById(R.id.comfort_text);
     carWashText = (TextView) findViewById(R.id.car_wash_text);
     sportText = (TextView) findViewById(R.id.sport_text);
+    swipeRefresh = (SwipeRefreshLayout)findViewById(R.id.swipe_refresh);
+    drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+    navButton = (Button) findViewById(R.id.nav_button);
 
+    swipeRefresh.setColorSchemeResources(R.color.colorPrimary);
     SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
     String weatherString =prefs.getString("weather", null);
-    final String weatherId;
+
     if (weatherString != null) {
         // 有缓存时直接解析天气数据
-        Log.e("cache exists","---");
+
         Weather weather = Utility.handlerWeatherResponse(weatherString);
-        weatherId = weather.basic.weatherId;
+        mWeatherId = weather.basic.weatherId;
+        Log.e("cache exists","---"+mWeatherId);
         showWeatherInfo(weather);
     } else {
         // 无缓存时去服务器查询天气
         Log.e("cache not exists","---");
-        weatherId = getIntent().getStringExtra("weather_id");
+        mWeatherId = getIntent().getStringExtra("weather");
         weatherLayout.setVisibility(View.INVISIBLE);
-        requestWeather(weatherId);
+
+        requestWeather(mWeatherId);
     }
 
+    swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener(){
+        public void onRefresh(){
+            mWeatherId = getIntent().getStringExtra("weather");
+            if (mWeatherId==null){
+                SharedPreferences prefs2 = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this);
+                mWeatherId =prefs2.getString("weatherId", null);
+            }
+            requestWeather(mWeatherId);
+        }
+    });
     String bingPic = prefs.getString("bing_pic",null);
     if(bingPic != null){
         Glide.with(this).load(bingPic).into(bingPicimg);
     }else{
         loadBingPic();
     }
+
+    navButton.setOnClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            drawerLayout.openDrawer(GravityCompat.START);
+        }
+    });
 }
 
     /**
@@ -103,9 +132,8 @@ protected void onCreate(Bundle savedInstanceState) {
      */
     public void requestWeather(final String weatherId) {
 
-        //String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId + "&key=6841ef143bc542d8a7d05fb84352daeb";
-        String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId + "&key=bc0418b57b2d4918819d3974ac1285d9";
-        Log.e("Url failed", weatherId);
+        String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId + "&key=6841ef143bc542d8a7d05fb84352daeb";
+        //String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId + "&key=bc0418b57b2d4918819d3974ac1285d9";
         HttpUtil.sendOkHttpRequest(weatherUrl, new Callback() {
 
             @Override
@@ -115,6 +143,7 @@ protected void onCreate(Bundle savedInstanceState) {
                     @Override
                     public void run() {
                         Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
+                        swipeRefresh.setRefreshing(false);
                     }
                 });
             }
@@ -134,6 +163,7 @@ protected void onCreate(Bundle savedInstanceState) {
                         } else {
                             Toast.makeText(WeatherActivity.this, "获取天气信息失败", Toast.LENGTH_SHORT).show();
                         }
+                        swipeRefresh.setRefreshing(false);
                     }
                 });
             }
@@ -180,6 +210,9 @@ protected void onCreate(Bundle savedInstanceState) {
         carWashText.setText(carWash);
         sportText.setText(sport);
         weatherLayout.setVisibility(View.VISIBLE);
+
+        Intent intent = new Intent(this, AutoUpdateService.class);
+        startService(intent);
     }
     /**
      * 加载必应每日一图
